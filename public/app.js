@@ -1,7 +1,13 @@
-async function fetchTasks(projectId) {
-  const res = await fetch(`/projects/${projectId}/tasks`);
-  const data = await res.json();
-  return data.tasks;
+async function fetchTasks(projectId, forceRefresh = false) {
+  try {
+    const url = `/projects/${projectId}/tasks${forceRefresh ? '?refresh=1' : ''}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('API error');
+    const data = await res.json();
+    return data.tasks || [];
+  } catch (e) {
+    return [];
+  }
 }
 
 function renderTable(tasks) {
@@ -67,6 +73,14 @@ function renderValue(val, key) {
   return String(val);
 }
 
+let lastTasks = [];
+
+async function fetchTasksAndUpdate(projectId) {
+  const tasks = await fetchTasks(projectId, true);
+  lastTasks = tasks;
+  document.getElementById('table-container').innerHTML = renderTable(tasks);
+}
+
 async function main() {
   const url = new URL(window.location.href);
   const projectId = url.searchParams.get('projectId') || '';
@@ -75,8 +89,16 @@ async function main() {
     return;
   }
   document.getElementById('project-title').textContent = `Project ${projectId} Tasks`;
+  // Show last loaded tasks (site cache) if available
+  if (lastTasks.length) {
+    document.getElementById('table-container').innerHTML = renderTable(lastTasks);
+  }
+  // Always fetch fresh data and update table and cache
   const tasks = await fetchTasks(projectId);
+  lastTasks = tasks;
   document.getElementById('table-container').innerHTML = renderTable(tasks);
+  // Fetch again in background to keep cache fresh
+  fetchTasksAndUpdate(projectId);
 }
 
 main();

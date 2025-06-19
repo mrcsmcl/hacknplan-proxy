@@ -16,7 +16,15 @@ if (!API_KEY) {
   process.exit(1);
 }
 
-async function fetchAllWorkItems(projectId) {
+const cache = new Map();
+const cacheTimestamps = new Map();
+const CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
+
+async function fetchAllWorkItems(projectId, forceRefresh = false) {
+  const now = Date.now();
+  if (!forceRefresh && cache.has(projectId) && (now - cacheTimestamps.get(projectId) < CACHE_TTL_MS)) {
+    return cache.get(projectId);
+  }
   const limit = 100;
   let offset = 0;
   let all    = [];
@@ -34,16 +42,27 @@ async function fetchAllWorkItems(projectId) {
     all.push(...items);
     offset += limit;
   }
-
+  cache.set(projectId, all);
+  cacheTimestamps.set(projectId, now);
   return all;
 }
 
 app.get('/projects/:projectId/tasks', async (req, res) => {
-  try {
-    const tasks = await fetchAllWorkItems(req.params.projectId);
-    res.json({ count: tasks.length, tasks });
-  } catch (err) {
-    res.status(500).json({ error: 'Error fetching tasks', detail: err.message });
+  const projectId = req.params.projectId;
+  const now = Date.now();
+  let tasks = [];
+  let fromCache = false;
+  if (cache.has(projectId) && (now - cacheTimestamps.get(projectId) < CACHE_TTL_MS)) {
+    tasks = cache.get(projectId);
+    fromCache = true;
+  } else {
+    tasks = await fetchAllWorkItems(projectId);
+    fromCache = false;
+  }
+  res.json({ count: tasks.length, tasks });
+  // Always update cache in the background if cache is old or missing
+  if (fromCache) {
+    fetchAllWorkItems(projectId, true).catch(() => {});
   }
 });
 
