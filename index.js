@@ -1,11 +1,14 @@
 require('dotenv').config();
 const express = require('express');
 const axios   = require('axios');
+const cors    = require('cors');
 
 const app     = express();
 const PORT    = process.env.PORT || 4765;
 const API_KEY = process.env.HNP_API_KEY;
 const BASE    = 'https://api.hacknplan.com/v0/projects';
+
+app.use(cors());
 
 if (!API_KEY) {
   console.error('❌ HNP_API_KEY is not defined!');
