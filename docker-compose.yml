@@ -1,0 +1,9 @@
+version: '3.8'
+services:
+  hacknplan-proxy:
+    build: .
+    env_file:
+      - .env
+    ports:
+      - "4765:4765"
+    restart: unless-stopped
