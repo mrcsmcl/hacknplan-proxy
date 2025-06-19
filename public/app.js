@@ -73,11 +73,31 @@ function renderValue(val, key) {
   return String(val);
 }
 
+document.getElementById('download-cache').addEventListener('click', function() {
+  const url = new URL(window.location.href);
+  const projectId = url.searchParams.get('projectId') || '';
+  if (!projectId) return;
+  const cacheKey = 'tasks_cache_' + projectId;
+  let cacheData = localStorage.getItem(cacheKey);
+  if (!cacheData) {
+    // fallback to lastTasks in memory
+    cacheData = JSON.stringify(lastTasks, null, 2);
+  }
+  const blob = new Blob([cacheData], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `tasks-cache-${projectId}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+});
+
 let lastTasks = [];
 
 async function fetchTasksAndUpdate(projectId) {
   const tasks = await fetchTasks(projectId, true);
   lastTasks = tasks;
+  localStorage.setItem('tasks_cache_' + projectId, JSON.stringify(tasks, null, 2));
   document.getElementById('table-container').innerHTML = renderTable(tasks);
 }
 
@@ -90,12 +110,15 @@ async function main() {
   }
   document.getElementById('project-title').textContent = `Project ${projectId} Tasks`;
   // Show last loaded tasks (site cache) if available
-  if (lastTasks.length) {
+  let cacheData = localStorage.getItem('tasks_cache_' + projectId);
+  if (cacheData) {
+    lastTasks = JSON.parse(cacheData);
     document.getElementById('table-container').innerHTML = renderTable(lastTasks);
   }
   // Always fetch fresh data and update table and cache
   const tasks = await fetchTasks(projectId);
   lastTasks = tasks;
+  localStorage.setItem('tasks_cache_' + projectId, JSON.stringify(tasks, null, 2));
   document.getElementById('table-container').innerHTML = renderTable(tasks);
   // Fetch again in background to keep cache fresh
   fetchTasksAndUpdate(projectId);

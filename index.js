@@ -11,6 +11,7 @@ const BASE    = 'https://api.hacknplan.com/v0/projects';
 app.use(cors());
 app.use('/static', express.static(__dirname + '/public'));
 app.use('/', express.static(__dirname + '/public'));
+app.disable('x-powered-by');
 
 if (!API_KEY) {
   process.exit(1);
@@ -63,6 +64,18 @@ app.get('/projects/:projectId/tasks', async (req, res) => {
   // Always update cache in the background if cache is old or missing
   if (fromCache) {
     fetchAllWorkItems(projectId, true).catch(() => {});
+  }
+});
+
+app.get('/projects/:projectId/cache.txt', async (req, res) => {
+  try {
+    const projectId = req.params.projectId;
+    const tasks = await fetchAllWorkItems(projectId, true);
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', 'inline');
+    res.send(JSON.stringify(tasks, null, 2));
+  } catch (err) {
+    res.status(500).send('Error generating cache file.');
   }
 });
 
